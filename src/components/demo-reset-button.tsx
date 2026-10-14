@@ -1,0 +1,3 @@
+'use client';
+import { RotateCcw } from 'lucide-react';
+export function DemoResetButton(){async function reset(){if(!confirm('Reset this demo on this device? Offline drafts, tour state, dashboard preview preferences and cached app data will be cleared.'))return;for(const k of Object.keys(localStorage)){if(k.startsWith('rentflow:'))localStorage.removeItem(k)}for(const k of Object.keys(sessionStorage)){if(k.startsWith('rentflow:'))sessionStorage.removeItem(k)}if('caches'in window){for(const k of await caches.keys())await caches.delete(k)}location.href='/dashboard?message=Demo%20reset%20to%20clean%20sample%20data.'}return <button className="btn btn-secondary" onClick={reset}><RotateCcw size={15}/> Reset demo data</button>}

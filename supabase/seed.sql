@@ -1,0 +1,4 @@
+-- Run schema.sql first. Real users are created through Supabase Auth.
+-- This seed file intentionally does not create auth users.
+-- After registering and creating a business through the app, you can use these examples by replacing BUSINESS_ID / BRANCH_ID as needed.
+-- select public.generate_rent_charges(date_trunc('month',current_date)::date);

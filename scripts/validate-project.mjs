@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+const requiredFiles=[
+  'src/app/(auth)/login/page.tsx','src/app/(auth)/signup/page.tsx','src/app/(auth)/forgot-password/page.tsx','src/app/(auth)/update-password/page.tsx','src/app/(auth)/onboarding/page.tsx',
+  'src/app/(app)/dashboard/page.tsx','src/app/(app)/branches/page.tsx','src/app/(app)/properties/page.tsx','src/app/(app)/units/page.tsx','src/app/(app)/tenants/page.tsx','src/app/(app)/tenants/[id]/page.tsx','src/app/(app)/leases/page.tsx','src/app/(app)/rent-charges/page.tsx','src/app/(app)/payments/page.tsx','src/app/(app)/arrears/page.tsx','src/app/(app)/expenses/page.tsx','src/app/(app)/maintenance/page.tsx','src/app/(app)/reports/page.tsx','src/app/(app)/staff/page.tsx','src/app/(app)/notifications/page.tsx','src/app/(app)/settings/page.tsx','src/app/(app)/audit/page.tsx','src/app/(app)/calendar/page.tsx',
+  'src/app/api/receipts/[id]/pdf/route.ts','src/app/api/reports/pdf/route.ts','src/app/api/export/[kind]/route.ts','src/app/(app)/search/page.tsx','src/app/privacy/page.tsx','src/app/terms/page.tsx','src/app/actions.ts','src/components/mobile-nav.tsx','src/components/product-tour.tsx','src/components/dashboard-widget-customizer.tsx','src/components/activity-timeline.tsx','src/components/pwa-client.tsx','src/components/offline-maintenance-drafts.tsx','src/components/demo-reset-button.tsx','public/manifest.webmanifest','public/sw.js','supabase/schema.sql','supabase/migrations/20261014_v1_launch_polish.sql','supabase/cron.sql','docs/SPEC_COVERAGE.md'
+];
+const missing=requiredFiles.filter(f=>!fs.existsSync(f));
+const schema=fs.readFileSync('supabase/schema.sql','utf8');
+const actions=fs.readFileSync('src/app/actions.ts','utf8');
+const requiredSchema=['create_business_onboarding','generate_rent_charges_range','record_rent_payment','payment_allocations','refresh_operational_alerts','member_branch_access','audit_logs','tenant-documents','expense-documents','one_active_lease_per_unit','prevent_overlapping_active_leases','apply_unallocated_payments','tenants_business_name_idx','activity_events','inspections','reverse_rent_payment'];
+const requiredActions=['completeOnboarding','uploadTenantDocument','renewLease','recordPayment','inviteStaff','updateBusinessSettings','updateMaintenance','reversePayment','createInspection','saveDashboardWidgets','completeProductTour','syncOfflineMaintenanceDraft'];
+const missingTokens=[...requiredSchema.filter(x=>!schema.includes(x)).map(x=>`schema:${x}`),...requiredActions.filter(x=>!actions.includes(x)).map(x=>`action:${x}`)];
+if(missing.length||missingTokens.length){console.error('Validation failed');if(missing.length)console.error('Missing files:',missing);if(missingTokens.length)console.error('Missing capabilities:',missingTokens);process.exit(1)}
+console.log(`RentFlow structural validation passed: ${requiredFiles.length} required files and ${requiredSchema.length+requiredActions.length} core capability markers found.`);

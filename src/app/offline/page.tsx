@@ -1,0 +1,2 @@
+import Link from 'next/link';import { WifiOff } from 'lucide-react';
+export default function Offline(){return <main className="error-page"><section className="error-card"><WifiOff size={32}/><h1>You’re offline</h1><p>RentFlow protects live financial data from stale offline edits. You can still reopen cached static screens and create maintenance drafts from the Maintenance page; those drafts sync when your connection returns.</p><Link className="btn btn-primary" href="/maintenance">Open maintenance drafts</Link></section></main>}

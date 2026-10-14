@@ -1,0 +1,17 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { ArrowLeft,Download } from 'lucide-react';
+import { getReceiptDetail } from '@/lib/data';
+import { money,dateLabel } from '@/lib/utils';
+import { PrintButton } from '@/components/print-button';
+
+export default async function ReceiptPage({params}:{params:Promise<{id:string}>}){
+  const {id}=await params;const d=await getReceiptDetail(id);if(!d)notFound();
+  const {payment:p,business:b,outstanding,advanceCredit=0}=d;const currency=b?.currency||'UGX';
+  const whatsapp=`https://wa.me/${String(p.tenantPhone||'').replace(/\D/g,'')}?text=${encodeURIComponent(`Hello ${p.tenant}, receipt ${p.receipt} confirms ${money(p.amount,currency)} received for ${p.property} · Unit ${p.unit}. Outstanding balance: ${money(outstanding,currency)}.`)}`;
+  const email=`mailto:?subject=${encodeURIComponent(`Receipt ${p.receipt}`)}&body=${encodeURIComponent(`Payment receipt ${p.receipt} for ${currency} ${p.amount}.`)}`;
+  return <div className="content">
+    <div className="page-head no-print"><div><Link href="/payments" className="subtle"><ArrowLeft size={14} style={{verticalAlign:'middle'}}/> Back to payments</Link><h1>Receipt {p.receipt}</h1><p>{p.reversedAt?'Voided payment receipt retained for audit history.':'Payment acknowledgement and downloadable PDF.'}</p></div><div className="row-actions">{!p.reversedAt&&<><a className="btn btn-secondary" href={whatsapp} target="_blank">WhatsApp</a><a className="btn btn-secondary" href={email}>Email</a></>}<a className="btn btn-secondary" href={`/api/receipts/${p.id}/pdf`}><Download size={16}/> Download PDF</a><PrintButton/></div></div>
+    <section className={`card receipt-sheet ${p.reversedAt?'receipt-void':''}`}>{p.reversedAt&&<div className="void-stamp">REVERSED</div>}<div className="card-body receipt-body">{b?.logoUrl&&<img src={b.logoUrl} alt="Business logo" className="receipt-logo"/>}<div className="receipt-head"><div><h2>{b?.name}</h2><div className="subtle">{b?.address}</div><div className="subtle">{b?.phone} {b?.email&&`· ${b.email}`}</div></div><div className="receipt-number"><b>{p.receipt}</b><div className="subtle">Issued {dateLabel(p.date)}</div></div></div><div className="grid receipt-grid"><div><div className="subtle">Received from</div><h3>{p.tenant}</h3><div>{p.property} · Unit {p.unit}</div></div><div className="receipt-amount"><div className="subtle">Amount paid</div><div>{money(p.amount,currency)}</div><span>{p.method}</span></div></div><div className="receipt-lines"><div className="kpi-line"><strong>Payment date</strong><span>{dateLabel(p.date)}</span></div><div className="kpi-line"><strong>Reference</strong><span>{p.reference||'—'}</span></div><div className="kpi-line"><strong>Recorded by</strong><span>{p.recordedBy}</span></div><div className="kpi-line"><strong>Outstanding balance</strong><span>{money(outstanding,currency)}</span></div>{advanceCredit>0&&!p.reversedAt&&<div className="kpi-line"><strong>Advance credit</strong><span>{money(advanceCredit,currency)}</span></div>}<div className="kpi-line"><strong>Status</strong><span>{p.reversedAt?'Reversed':'Received'}</span></div>{p.reversedAt&&<div className="kpi-line"><strong>Reversal reason</strong><span>{p.reversalReason||'—'}</span></div>}</div><p className="subtle receipt-footer">{b?.receiptFooter||'Computer-generated receipt. Keep this document for your records.'}</p></div></section>
+  </div>;
+}

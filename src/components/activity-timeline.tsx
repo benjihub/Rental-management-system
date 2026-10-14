@@ -1,0 +1,4 @@
+import { Activity,Clock3 } from 'lucide-react';
+import type { ActivityItem } from '@/types';
+import { dateLabel } from '@/lib/utils';
+export function ActivityTimeline({items,title='Activity timeline'}:{items:ActivityItem[];title?:string}){return <section className="card activity-card"><div className="card-head"><h2><Activity size={16}/> {title}</h2><span className="subtle">Newest first</span></div><div className="card-body">{items.length?<div className="timeline">{items.map(x=><article key={x.id}><div className="timeline-dot"/><div><div className="timeline-title"><b>{x.title}</b><span>{x.actor}</span></div>{x.body&&<p>{x.body}</p>}<small><Clock3 size={11}/>{dateLabel(x.occurredAt)} · {new Date(x.occurredAt).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</small></div></article>)}</div>:<div className="empty compact"><b>No activity yet</b><div>Important changes will appear here automatically.</div></div>}</div></section>}

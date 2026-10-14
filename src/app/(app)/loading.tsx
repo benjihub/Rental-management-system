@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="content"><div className="skeleton h32 w40"/><div className="skeleton h14 w60"/><div className="grid stats" style={{marginTop:24}}>{[1,2,3,4].map(x=><div key={x} className="skeleton skeleton-card"/>)}</div><div className="skeleton skeleton-table"/></div>}
