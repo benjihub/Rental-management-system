@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { MobileNav } from '@/components/mobile-nav';
@@ -22,5 +23,5 @@ export default async function AppLayout({children}:{children:React.ReactNode}){
     role=membership.role;
   }
   const profile=await getProfile();
-  return <div className="app-shell"><Sidebar role={role}/><main className="main"><Topbar/><FlashMessage/>{children}</main><MobileNav role={role}/><ProductTour enabled={!profile?.preferences?.tourCompleted}/></div>;
+  return <div className="app-shell"><Sidebar role={role}/><main className="main"><Topbar/><Suspense fallback={null}><FlashMessage/></Suspense>{children}</main><MobileNav role={role}/><ProductTour enabled={!profile?.preferences?.tourCompleted}/></div>;
 }

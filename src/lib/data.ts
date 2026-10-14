@@ -1,7 +1,11 @@
 import { demoMode } from '@/lib/config';
 import * as demo from '@/lib/demo';
 import { createClient } from '@/lib/supabase/server';
-import type { ActivityItem, AuditLog, Branch, CalendarEvent, Expense, ExpenseCategory, Inspection, Lease, Maintenance, Notification, Payment, Property, RentCharge, Staff, Tenant, TenantDocument, Unit, UserPreferences } from '@/types';
+import type { ActivityItem, AuditLog, Branch, CalendarEvent, Expense, ExpenseCategory, Inspection, Lease, Maintenance, Notification, Payment, Property, RentCharge, Staff, Tenant, TenantDetail, TenantDocument, Unit, UserPreferences } from '@/types';
+
+function singleRelation<T>(value:T|T[]|null|undefined):T|undefined{
+  return Array.isArray(value)?value[0]:value??undefined;
+}
 
 async function identity(){
   const supabase=await createClient();
@@ -54,14 +58,15 @@ export async function getTenants():Promise<Tenant[]> {
   return (data||[]).map((r:any)=>{const l=(r.leases||[]).find((x:any)=>['ACTIVE','ENDING_SOON'].includes(x.status));const balance=(r.leases||[]).flatMap((x:any)=>x.rent_charges||[]).filter((c:any)=>['UPCOMING','UNPAID','PARTIALLY_PAID','OVERDUE'].includes(c.status)).reduce((sum:number,c:any)=>sum+Math.max(0,Number(c.amount)-Number(c.paid_amount)),0);return {id:r.id,branchId:r.branch_id,branch:r.branches?.name||'',name:r.full_name,phone:r.phone,email:r.email||'',nationalId:r.national_id||'',gender:r.gender||'',dateOfBirth:r.date_of_birth||'',occupation:r.occupation||'',employer:r.employer||'',previousAddress:r.previous_address||'',emergencyContactName:r.emergency_contact_name||'',emergencyContactPhone:r.emergency_contact_phone||'',notes:r.notes||'',unit:l?.units?.name,property:l?.units?.properties?.name,rent:Number(l?.rent_amount||0),balance,status:r.status};});
 }
 
-export async function getTenantDetail(id:string):Promise<any>{
+export async function getTenantDetail(id:string):Promise<TenantDetail|null>{
   if(demoMode){const t=demo.tenants.find(x=>x.id===id)||demo.tenants[0];return {tenant:t,leases:demo.leases.filter(l=>l.tenantId===t.id),payments:demo.payments.filter(p=>p.tenant===t.name),maintenance:demo.maintenance.filter(m=>m.tenant===t.name),documents:[] as TenantDocument[]};}
   const {supabase,businessId}=await identity(); if(!businessId)return null;
   const {data:t,error}=await supabase.from('tenants').select('id,branch_id,full_name,phone,email,national_id,gender,date_of_birth,occupation,employer,previous_address,emergency_contact_name,emergency_contact_phone,notes,status,branches(name)').eq('business_id',businessId).eq('id',id).single(); if(error)throw error;
   const [leases,payments,maintenance,docs]=await Promise.all([getLeases(id),getPayments(id),getMaintenance(id),supabase.from('documents').select('id,document_type,file_url,file_name,created_at').eq('business_id',businessId).eq('tenant_id',id).order('created_at',{ascending:false})]);
   const documents:TenantDocument[]=[]; for(const d of docs.data||[]){const {data:signed}=await supabase.storage.from('tenant-documents').createSignedUrl(d.file_url,3600);documents.push({id:d.id,type:d.document_type,fileName:d.file_name,url:signed?.signedUrl||'',createdAt:d.created_at});}
   const active=leases.find(l=>['ACTIVE','ENDING_SOON'].includes(l.status)); const charges=await getRentCharges({tenantId:id}); const bal=charges.reduce((s,c)=>s+c.balance,0);
-  const tenant:Tenant={id:t.id,branchId:t.branch_id,branch:t.branches?.name||'',name:t.full_name,phone:t.phone,email:t.email||'',nationalId:t.national_id||'',gender:t.gender||'',dateOfBirth:t.date_of_birth||'',occupation:t.occupation||'',employer:t.employer||'',previousAddress:t.previous_address||'',emergencyContactName:t.emergency_contact_name||'',emergencyContactPhone:t.emergency_contact_phone||'',notes:t.notes||'',unit:active?.unit,property:active?.property,rent:active?.rent||0,balance:bal,status:t.status};
+  const tenantBranch=singleRelation(t.branches);
+  const tenant:Tenant={id:t.id,branchId:t.branch_id,branch:tenantBranch?.name||'',name:t.full_name,phone:t.phone,email:t.email||'',nationalId:t.national_id||'',gender:t.gender||'',dateOfBirth:t.date_of_birth||'',occupation:t.occupation||'',employer:t.employer||'',previousAddress:t.previous_address||'',emergencyContactName:t.emergency_contact_name||'',emergencyContactPhone:t.emergency_contact_phone||'',notes:t.notes||'',unit:active?.unit,property:active?.property,rent:active?.rent||0,balance:bal,status:t.status};
   return {tenant,leases,payments,maintenance,documents};
 }
 
@@ -89,7 +94,8 @@ export async function getReceiptDetail(id:string):Promise<any>{
   const {data,error}=await supabase.from('payments').select('id,tenant_id,lease_id,amount,payment_method,payment_date,reference,notes,reversed_at,reversal_reason,tenants(full_name,phone),leases(units(name,properties(name))),receipts(receipt_number),profiles!payments_recorded_by_fkey(full_name),payment_allocations(amount,rent_charges(due_date,charge_period))').eq('business_id',businessId).eq('id',id).single(); if(error)throw error;
   const {data:charges}=await supabase.from('rent_charges').select('amount,paid_amount').eq('lease_id',data.lease_id).in('status',['UPCOMING','UNPAID','PARTIALLY_PAID','OVERDUE']);
   const outstanding=(charges||[]).reduce((s:any,c:any)=>s+Math.max(0,Number(c.amount)-Number(c.paid_amount)),0);
-  const payment={id:data.id,receipt:data.receipts?.[0]?.receipt_number||'—',tenant:data.tenants?.full_name||'',tenantPhone:data.tenants?.phone||'',tenantId:data.tenant_id,leaseId:data.lease_id,property:data.leases?.units?.properties?.name||'',unit:data.leases?.units?.name||'',amount:Number(data.amount),method:data.payment_method,date:data.payment_date,reference:data.reference||'',notes:data.notes||'',recordedBy:data.profiles?.full_name||'System',reversedAt:data.reversed_at||null,reversalReason:data.reversal_reason||null,status:data.reversed_at?'REVERSED':'RECEIVED'};
+  const paymentTenant=singleRelation(data.tenants);const paymentLease=singleRelation(data.leases);const paymentUnit=singleRelation(paymentLease?.units);const paymentProperty=singleRelation(paymentUnit?.properties);const recordedBy=singleRelation(data.profiles);
+  const payment:Payment={id:data.id,receipt:data.receipts?.[0]?.receipt_number||'—',tenant:paymentTenant?.full_name||'',tenantPhone:paymentTenant?.phone||'',tenantId:data.tenant_id,leaseId:data.lease_id,property:paymentProperty?.name||'',unit:paymentUnit?.name||'',amount:Number(data.amount),method:data.payment_method,date:data.payment_date,reference:data.reference||'',notes:data.notes||'',recordedBy:recordedBy?.full_name||'System',reversedAt:data.reversed_at||null,reversalReason:data.reversal_reason||null,status:data.reversed_at?'REVERSED':'RECEIVED'};
   const allocated=(data.payment_allocations||[]).reduce((sum:number,a:any)=>sum+Number(a.amount||0),0);const advanceCredit=data.reversed_at?0:Math.max(0,Number(data.amount)-allocated);return {payment,business:await getBusinessInfo(),outstanding,allocations:data.payment_allocations||[],advanceCredit};
 }
 
@@ -98,7 +104,7 @@ export async function getExpenseCategories():Promise<ExpenseCategory[]>{ if(demo
 export async function getExpenses():Promise<Expense[]> {
   if(demoMode)return demo.expenses;
   const {supabase,businessId}=await identity(); if(!businessId)return[]; const {data,error}=await supabase.from('expenses').select('id,branch_id,property_id,category_id,description,amount,expense_date,payment_method,document_url,branches(name),properties(name),expense_categories(name)').eq('business_id',businessId).order('expense_date',{ascending:false}); if(error)throw error;
-  const out:Expense[]=[];for(const r of data||[]){let url='';if(r.document_url){const {data:signed}=await supabase.storage.from('expense-documents').createSignedUrl(r.document_url,3600);url=signed?.signedUrl||'';}out.push({id:r.id,branchId:r.branch_id,propertyId:r.property_id,categoryId:r.category_id,branch:r.branches?.name||'General',property:r.properties?.name||'—',category:r.expense_categories?.name||'Other',description:r.description,amount:Number(r.amount),date:r.expense_date,method:r.payment_method||'—',documentUrl:url});}return out;
+  const out:Expense[]=[];for(const r of data||[]){let url='';if(r.document_url){const {data:signed}=await supabase.storage.from('expense-documents').createSignedUrl(r.document_url,3600);url=signed?.signedUrl||'';}const branch=singleRelation(r.branches);const property=singleRelation(r.properties);const category=singleRelation(r.expense_categories);out.push({id:r.id,branchId:r.branch_id,propertyId:r.property_id,categoryId:r.category_id,branch:branch?.name||'General',property:property?.name||'—',category:category?.name||'Other',description:r.description,amount:Number(r.amount),date:r.expense_date,method:r.payment_method||'—',documentUrl:url});}return out;
 }
 
 export async function getMaintenance(tenantId?:string):Promise<Maintenance[]> {
@@ -200,7 +206,7 @@ export async function getPaymentsPage(page=1,pageSize=25,tenantId?:string):Promi
   if(demoMode){const all=tenantId?demo.payments.filter(p=>p.tenant===demo.tenants.find(t=>t.id===tenantId)?.name):demo.payments;return demoPage(all,page,pageSize);}
   const {supabase,businessId}=await identity();if(!businessId)return {rows:[],page:1,pageSize,total:0};const from=(Math.max(1,page)-1)*pageSize;
   let q=supabase.from('payments').select('id,tenant_id,lease_id,amount,payment_method,payment_date,reference,notes,reversed_at,reversal_reason,tenants(full_name),leases(units(name,properties(name))),receipts(receipt_number),profiles!payments_recorded_by_fkey(full_name)',{count:'exact'}).eq('business_id',businessId).order('payment_date',{ascending:false});if(tenantId)q=q.eq('tenant_id',tenantId);const {data,count,error}=await q.range(from,from+pageSize-1);if(error)throw error;
-  const rows=(data||[]).map((r:any)=>({id:r.id,receipt:r.receipts?.[0]?.receipt_number||'—',tenant:r.tenants?.full_name||'',tenantId:r.tenant_id,leaseId:r.lease_id,property:r.leases?.units?.properties?.name||'',unit:r.leases?.units?.name||'',amount:Number(r.amount),method:r.payment_method,date:r.payment_date,reference:r.reference||'',notes:r.notes||'',recordedBy:r.profiles?.full_name||'System',reversedAt:r.reversed_at||null,reversalReason:r.reversal_reason||null,status:r.reversed_at?'REVERSED':'RECEIVED'}));
+  const rows:Payment[]=(data||[]).map((r:any):Payment=>({id:r.id,receipt:r.receipts?.[0]?.receipt_number||'—',tenant:r.tenants?.full_name||'',tenantId:r.tenant_id,leaseId:r.lease_id,property:r.leases?.units?.properties?.name||'',unit:r.leases?.units?.name||'',amount:Number(r.amount),method:r.payment_method,date:r.payment_date,reference:r.reference||'',notes:r.notes||'',recordedBy:r.profiles?.full_name||'System',reversedAt:r.reversed_at||null,reversalReason:r.reversal_reason||null,status:r.reversed_at?'REVERSED':'RECEIVED'}));
   return {rows,page:Math.max(1,page),pageSize,total:count||0};
 }
 
@@ -216,7 +222,7 @@ export async function getExpensesPage(page=1,pageSize=25):Promise<PageResult<Exp
   if(demoMode)return demoPage(demo.expenses,page,pageSize);
   const {supabase,businessId}=await identity();if(!businessId)return {rows:[],page:1,pageSize,total:0};const from=(Math.max(1,page)-1)*pageSize;
   const {data,count,error}=await supabase.from('expenses').select('id,branch_id,property_id,category_id,description,amount,expense_date,payment_method,document_url,branches(name),properties(name),expense_categories(name)',{count:'exact'}).eq('business_id',businessId).order('expense_date',{ascending:false}).range(from,from+pageSize-1);if(error)throw error;
-  const rows:Expense[]=[];for(const r of data||[]){let url='';if(r.document_url){const {data:signed}=await supabase.storage.from('expense-documents').createSignedUrl(r.document_url,3600);url=signed?.signedUrl||'';}rows.push({id:r.id,branchId:r.branch_id,propertyId:r.property_id,categoryId:r.category_id,branch:r.branches?.name||'General',property:r.properties?.name||'—',category:r.expense_categories?.name||'Other',description:r.description,amount:Number(r.amount),date:r.expense_date,method:r.payment_method||'—',documentUrl:url});}return {rows,page:Math.max(1,page),pageSize,total:count||0};
+  const rows:Expense[]=[];for(const r of data||[]){let url='';if(r.document_url){const {data:signed}=await supabase.storage.from('expense-documents').createSignedUrl(r.document_url,3600);url=signed?.signedUrl||'';}const branch=singleRelation(r.branches);const property=singleRelation(r.properties);const category=singleRelation(r.expense_categories);rows.push({id:r.id,branchId:r.branch_id,propertyId:r.property_id,categoryId:r.category_id,branch:branch?.name||'General',property:property?.name||'—',category:category?.name||'Other',description:r.description,amount:Number(r.amount),date:r.expense_date,method:r.payment_method||'—',documentUrl:url});}return {rows,page:Math.max(1,page),pageSize,total:count||0};
 }
 
 export async function getGlobalSearch(term:string){

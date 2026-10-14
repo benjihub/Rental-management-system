@@ -18,6 +18,7 @@ export interface ExpenseCategory {id:string;name:string}
 export interface Notification {id:string;kind:string;title:string;body:string;href?:string;readAt?:string|null;createdAt:string}
 export interface AuditLog {id:string;action:string;entityType:string;entityId?:string;user:string;createdAt:string;metadata:any}
 export interface TenantDocument {id:string;type:string;fileName:string;url:string;createdAt:string}
+export interface TenantDetail {tenant:Tenant;leases:Lease[];payments:Payment[];maintenance:Maintenance[];documents:TenantDocument[]}
 export interface DashboardData {metrics:{properties:number;units:number;occupied:number;vacant:number;expected:number;collected:number;outstanding:number;expenses:number};payments:Payment[];overdue:{tenant:string;property:string;unit:string;amount:number;days:number}[];vacantUnits:Unit[];expiring:{tenant:string;property:string;unit:string;endDate:string;days:number}[];monthly:{month:string;expected:number;collected:number;expenses:number}[]}
 
 export interface Inspection {id:string;propertyId:string;unitId?:string|null;tenantId?:string|null;property:string;unit:string;tenant:string;title:string;type:string;scheduledDate:string;scheduledTime?:string|null;notes?:string;status:'SCHEDULED'|'COMPLETED'|'CANCELLED';assignedTo?:string;assignedToId?:string;completedAt?:string|null}
